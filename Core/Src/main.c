@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "ring-buff.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,6 +32,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define BUFF_ARRAY_SIZE 1024
 
 /* USER CODE END PD */
 
@@ -45,21 +46,16 @@ UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
 
-/* Definitions for echo_rx */
-osThreadId_t echo_rxHandle;
-const osThreadAttr_t echo_rx_attributes = {
-  .name = "echo_rx",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for echo_tx */
-osThreadId_t echo_txHandle;
-const osThreadAttr_t echo_tx_attributes = {
-  .name = "echo_tx",
+/* Definitions for echo */
+osThreadId_t echoHandle;
+const osThreadAttr_t echo_attributes = {
+  .name = "echo",
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
+uint8_t buff_array[BUFF_ARRAY_SIZE];
+ring_buff_t echo_buff;
 
 /* USER CODE END PV */
 
@@ -68,8 +64,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
-void start_echo_rx(void *argument);
-void start_echo_tx(void *argument);
+void start_echo(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -135,11 +130,8 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of echo_rx */
-  echo_rxHandle = osThreadNew(start_echo_rx, NULL, &echo_rx_attributes);
-
-  /* creation of echo_tx */
-  echo_txHandle = osThreadNew(start_echo_tx, NULL, &echo_tx_attributes);
+  /* creation of echo */
+  echoHandle = osThreadNew(start_echo, NULL, &echo_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -275,43 +267,53 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+  if (huart == &huart1) {
+    // Дублируем функцию ring_buff_put, но с несколькими отличиями:
+    // 1. Мы не можем не записать данные, т.к. записываются они в буфер сразу, как только поступают на UART.
+    //    Мы можем только не передвигать head. Из-за этого, если буфер переполнен,
+    //    в последнем байте может быть записана чушь.
+    // 2. Не нужно находить размер 2 частей и использовать memcpy, т.к. записываются по байту и сразу же
+    if ((echo_buff.size - 1) != ring_buff_available(echo_buff.size, echo_buff.head, echo_buff.tail)) { // Если голова не сразу за хвостом
+      echo_buff.head = (echo_buff.head) % echo_buff.size;
+    }
+
+    HAL_UART_Receive_DMA(&huart1, &echo_buff.buff[echo_buff.head], 1);
+  }
+}
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_start_echo_rx */
+/* USER CODE BEGIN Header_start_echo */
 /**
-  * @brief  Function implementing the echo_rx thread.
+  * @brief  Function implementing the echo thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_start_echo_rx */
-void start_echo_rx(void *argument)
+/* USER CODE END Header_start_echo */
+void start_echo(void *argument)
 {
   /* USER CODE BEGIN 5 */
+  ring_buff_init(&echo_buff, buff_array, BUFF_ARRAY_SIZE);
+  HAL_UART_Receive_DMA(&huart1, &echo_buff.buff[echo_buff.head], 1);
+
   /* Infinite loop */
+  TickType_t ticks_period = pdMS_TO_TICKS(10);
+  TickType_t current_ticks = xTaskGetTickCount();
   for(;;)
   {
-    osDelay(1);
+    uint8_t state = HAL_UART_GetState(&huart1);
+    if (state != HAL_UART_STATE_BUSY_TX && state != HAL_UART_STATE_BUSY_TX_RX) {
+      size_t tx_size = ring_buff_available(echo_buff.size, echo_buff.head, echo_buff.tail);
+      if (tx_size) {
+        uint8_t tx_buf[BUFF_ARRAY_SIZE];
+        ring_buff_get(&echo_buff, tx_buf, tx_size); // Т.к. из возможных двух частей надо склеить целое
+        HAL_UART_Transmit_DMA(&huart1, tx_buf, tx_size);
+      }
+    }
+    vTaskDelayUntil(&current_ticks, ticks_period);
   }
   /* USER CODE END 5 */
-}
-
-/* USER CODE BEGIN Header_start_echo_tx */
-/**
-* @brief Function implementing the echo_tx thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_start_echo_tx */
-void start_echo_tx(void *argument)
-{
-  /* USER CODE BEGIN start_echo_tx */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
-  /* USER CODE END start_echo_tx */
 }
 
 /**

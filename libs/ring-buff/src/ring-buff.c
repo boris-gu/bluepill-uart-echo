@@ -25,9 +25,11 @@ size_t ring_buff_available(size_t buff_size, size_t head, size_t tail) {
 uint8_t ring_buff_put(ring_buff_t *rb, uint8_t *data, size_t data_size) {
   size_t local_head = rb->head;
   size_t local_tail = rb->tail;
+  // Проверка на доступное место
   if (rb->size - ring_buff_available(rb->size, local_head, local_tail) <= data_size) { // = чтобы head не совпал с tail
     return 0;
   }
+
   size_t part1_size = (data_size <= rb->size - local_head) ? data_size : rb->size - rb->head;
   size_t part2_size = data_size - part1_size;
 
@@ -40,10 +42,11 @@ uint8_t ring_buff_put(ring_buff_t *rb, uint8_t *data, size_t data_size) {
 uint8_t ring_buff_get(ring_buff_t *rb, uint8_t *data, size_t data_size) {
   size_t local_head = rb->head;
   size_t local_tail = rb->tail;
+  // TODO: Можно считывать меньше данных, чем запрошено и возвращать это число
   if (data_size > ring_buff_available(rb->size, local_head, local_tail)) {
     return 0;
   }
-  // TODO: Проверить
+
   size_t part1_size = (data_size <= rb->size - local_tail) ? data_size : rb->size - local_tail;
   size_t part2_size = data_size - part1_size;
 
