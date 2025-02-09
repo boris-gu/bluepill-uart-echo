@@ -48,13 +48,13 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
-    libs/ring_buff/src/ring_buff.c
+    libs/ring-buff/src/ring-buff.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
-    libs/ring_buff/include
+    libs/ring-buff/include
 )
 
 # Add project symbols (macros)
