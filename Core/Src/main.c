@@ -32,7 +32,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define BUFF_ARRAY_SIZE 1024
+#define BUFF_ARRAY_SIZE 256
 
 /* USER CODE END PD */
 
@@ -275,7 +275,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     //    в последнем байте может быть записана чушь.
     // 2. Не нужно находить размер 2 частей и использовать memcpy, т.к. записываются по байту и сразу же
     if ((echo_buff.size - 1) != ring_buff_available(echo_buff.size, echo_buff.head, echo_buff.tail)) { // Если голова не сразу за хвостом
-      echo_buff.head = (echo_buff.head) % echo_buff.size;
+      echo_buff.head = (echo_buff.head + 1) % echo_buff.size;
     }
 
     HAL_UART_Receive_DMA(&huart1, &echo_buff.buff[echo_buff.head], 1);
@@ -298,10 +298,9 @@ void start_echo(void *argument)
   HAL_UART_Receive_DMA(&huart1, &echo_buff.buff[echo_buff.head], 1);
 
   /* Infinite loop */
-  TickType_t ticks_period = pdMS_TO_TICKS(10);
+  TickType_t ticks_period = pdMS_TO_TICKS(1);
   TickType_t current_ticks = xTaskGetTickCount();
-  for(;;)
-  {
+  for(;;) {
     uint8_t state = HAL_UART_GetState(&huart1);
     if (state != HAL_UART_STATE_BUSY_TX && state != HAL_UART_STATE_BUSY_TX_RX) {
       size_t tx_size = ring_buff_available(echo_buff.size, echo_buff.head, echo_buff.tail);

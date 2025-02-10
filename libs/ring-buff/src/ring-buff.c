@@ -50,8 +50,8 @@ uint8_t ring_buff_get(ring_buff_t *rb, uint8_t *data, size_t data_size) {
   size_t part1_size = (data_size <= rb->size - local_tail) ? data_size : rb->size - local_tail;
   size_t part2_size = data_size - part1_size;
 
-  memcpy(&rb->buff[local_tail], data, part1_size);
-  memcpy(rb->buff, &data[part1_size], part2_size);
+  memcpy(data, &rb->buff[local_tail], part1_size);
+  memcpy(&data[part1_size], rb->buff, part2_size);
   rb->tail = (local_tail + data_size) % rb->size;
   return 1;
 }
