@@ -274,7 +274,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     //    Мы можем только не передвигать head. Из-за этого, если буфер переполнен,
     //    в последнем байте может быть записана чушь.
     // 2. Не нужно находить размер 2 частей и использовать memcpy, т.к. записываются по байту и сразу же
-    if ((echo_buff.size - 1) != ring_buff_available(echo_buff.size, echo_buff.head, echo_buff.tail)) { // Если голова не сразу за хвостом
+    if ((echo_buff.size - 1) != ring_buff_available(&echo_buff)) { // Если голова не сразу за хвостом
       echo_buff.head = (echo_buff.head + 1) % echo_buff.size;
     }
 
@@ -303,10 +303,9 @@ void start_echo(void *argument)
   for(;;) {
     uint8_t state = HAL_UART_GetState(&huart1);
     if (state != HAL_UART_STATE_BUSY_TX && state != HAL_UART_STATE_BUSY_TX_RX) {
-      size_t tx_size = ring_buff_available(echo_buff.size, echo_buff.head, echo_buff.tail);
+      uint8_t tx_buf[BUFF_ARRAY_SIZE];
+      size_t tx_size = ring_buff_get(&echo_buff, tx_buf, BUFF_ARRAY_SIZE);
       if (tx_size) {
-        uint8_t tx_buf[BUFF_ARRAY_SIZE];
-        ring_buff_get(&echo_buff, tx_buf, tx_size); // Т.к. из возможных двух частей надо склеить целое
         HAL_UART_Transmit_DMA(&huart1, tx_buf, tx_size);
       }
     }
