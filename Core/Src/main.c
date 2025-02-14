@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "ring-buff.h"
+#include "ring-buff-bg.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -269,15 +269,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   if (huart == &huart1) {
-    // Дублируем функцию ring_buff_put, но с несколькими отличиями:
-    // 1. Мы не можем не записать данные, т.к. записываются они в буфер сразу, как только поступают на UART.
-    //    Мы можем только не передвигать head. Из-за этого, если буфер переполнен,
-    //    в последнем байте может быть записана чушь.
-    // 2. Не нужно находить размер 2 частей и использовать memcpy, т.к. записываются по байту и сразу же
-    if ((echo_buff.size - 1) != ring_buff_available(&echo_buff)) { // Если голова не сразу за хвостом
-      echo_buff.head = (echo_buff.head + 1) % echo_buff.size;
-    }
-
+    ring_buff_move_head(&echo_buff, 1); // Передвигаем head, если есть возможность
     HAL_UART_Receive_DMA(&huart1, &echo_buff.buff[echo_buff.head], 1);
   }
 }

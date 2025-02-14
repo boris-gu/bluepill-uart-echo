@@ -1,7 +1,6 @@
-#include "ring-buff.h"
 #include <string.h>
 #include <stdbool.h>
-
+#include "ring-buff-bg.h"
 
 uint8_t ring_buff_init(ring_buff_t *rb, uint8_t *array, size_t array_size) {
   rb->buff = array;
@@ -50,9 +49,12 @@ uint8_t ring_buff_put(ring_buff_t *rb, uint8_t *data, size_t data_size) {
 
 
 uint8_t ring_buff_move_head(ring_buff_t *rb, size_t data_size) {
-  if ((rb->size - 1) != ring_buff_available_raw(rb->size, rb->head, rb->tail)) {  // Если голова не сразу за хвостом
-    rb->head = (rb->head + 1) % rb->size;
+  size_t local_tail = rb->tail;
+  if (rb->size - ring_buff_available_raw(rb->size, rb->head, local_tail) <= data_size) { // = чтобы head не совпал с tail
+    return false;
   }
+  rb->head = (rb->head + data_size) % rb->size;
+  return true;
 }
 
 
